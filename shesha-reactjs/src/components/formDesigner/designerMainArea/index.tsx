@@ -29,11 +29,17 @@ export const DesignerMainArea: FC<IDesignerMainAreaProps> = () => {
     const { designerWidth, zoom } = useCanvas();
     const { styles } = useStyles();
 
-    const leftSidebarProps = useMemo(() => 
-      readOnly ? null : { title: 'Builder Widgets', content: () => <Toolbox />, placeholder: 'Builder Widgets' }
-    , [readOnly]);
+    const formSettingsKey = useMemo(() => JSON.stringify({
+        layout: formSettings?.layout,
+        size: formSettings?.size,
+        labelCol: formSettings?.labelCol,
+        wrapperCol: formSettings?.wrapperCol,
+    }), [formSettings]);
 
-    return (
+    const leftSidebarProps = useMemo(() => 
+        readOnly ? null : { title: 'Builder Widgets', content: () => <Toolbox />, placeholder: 'Builder Widgets' }
+      , [readOnly]);
+      return (
         <div className={styles.mainArea} style={{
             borderTop: '1px solid #d3d3d3',
             ...(formMode !== 'designer' && {
@@ -58,10 +64,18 @@ export const DesignerMainArea: FC<IDesignerMainAreaProps> = () => {
                         wrap={(children) => (<MetadataProvider modelType={formSettings?.modelType}>{children}</MetadataProvider>)}
                     >
                         <ParentProvider model={null} formMode='designer'>
-                            <DataContextProvider id={SheshaCommonContexts.FormContext} name={SheshaCommonContexts.FormContext} type={'form'} 
+                            <DataContextProvider 
+                                id={SheshaCommonContexts.FormContext} 
+                                name={SheshaCommonContexts.FormContext} 
+                                type={'form'} 
                                 description='Form designer'
                             >
-                                <ConfigurableFormRenderer form={form} className={formMode === 'designer' ? styles.designerWorkArea : undefined}  >
+                                {/* Add key prop to force re-render */}
+                                <ConfigurableFormRenderer 
+                                    key={formSettingsKey}
+                                    form={form} 
+                                    className={formMode === 'designer' ? styles.designerWorkArea : undefined}
+                                >
                                     {isDebug && (
                                         <DebugPanel />
                                     )}
@@ -69,7 +83,6 @@ export const DesignerMainArea: FC<IDesignerMainAreaProps> = () => {
                             </DataContextProvider>
                         </ParentProvider>
                     </ConditionalWrap>
-
                 </div>
             </ConditionalWrap>
         </div>

@@ -4,6 +4,7 @@ import ComponentsContainer from '../formDesigner/containers/componentsContainer'
 import React, {
   FC,
   PropsWithChildren,
+  useMemo,
 } from 'react';
 import { ComponentsContainerForm } from '../formDesigner/containers/componentsContainerForm';
 import { ComponentsContainerProvider } from '@/providers/form/nesting/containerContext';
@@ -32,21 +33,21 @@ export const ConfigurableFormRenderer: FC<PropsWithChildren<IConfigurableFormRen
   ...props
 }) => {
   const { getPayload: getDelayedUpdates } = useDelayedUpdate(false) ?? {};
-
   const shaForm = useShaFormInstance();
-  const { settings: formSettings, setValidationErrors } = shaForm;
   shaForm.setDataSubmitContext({ getDelayedUpdates });
-
   const { styles } = useStyles();
   const { anyOfPermissionsGranted } = useSheshaApplication();
   const isDragging = useFormDesignerStateSelector(x => x.isDragging) ?? false;
 
+  // Get form settings from state
+  const formSettings = useFormDesignerStateSelector(x => x.formSettings);
+  
   const onValuesChangeInternal = (_changedValues: any, values: any) => {
     shaForm.setFormData({ values: values, mergeValues: true });
   };
 
   const onFinishInternal = async (): Promise<void> => {
-    setValidationErrors(null);
+    shaForm.setValidationErrors(null);
 
     if (!shaForm)
       return;
@@ -55,22 +56,23 @@ export const ConfigurableFormRenderer: FC<PropsWithChildren<IConfigurableFormRen
       await shaForm.submitData();
     } catch (error) {
       onSubmittedFailed?.();
-      setValidationErrors(error?.data?.error || error);
+      shaForm.setValidationErrors(error?.data?.error || error);
       console.error('Submit failed: ', error);
     }
   };
 
   const onFinishFailedInternal = (errorInfo: ValidateErrorEntity) => {
-    setValidationErrors(null);
+    shaForm.setValidationErrors(null);
     onFinishFailed?.(errorInfo);
   };
 
-  const mergedProps = {
-    layout: props.layout ?? formSettings.layout,
-    labelCol: props.labelCol ?? formSettings.labelCol,
-    wrapperCol: props.wrapperCol ?? formSettings.wrapperCol,
-    colon: formSettings.colon,
-  };
+  const mergedProps = useMemo(() => ({
+    layout: props.layout ?? formSettings?.layout,
+    labelCol: props.labelCol ?? formSettings?.labelCol,
+    wrapperCol: props.wrapperCol ?? formSettings?.wrapperCol,
+    colon: formSettings?.colon,
+    size: props.size,
+  }), [props.layout, props.labelCol, props.wrapperCol, props.size, formSettings]);
 
   if (formSettings?.access === 4 && !anyOfPermissionsGranted(formSettings?.permissions || [])) {
     return (
@@ -90,15 +92,15 @@ export const ConfigurableFormRenderer: FC<PropsWithChildren<IConfigurableFormRen
     );
   }
 
-  const { /*dataLoadingState,*/ dataSubmitState } = shaForm ?? {};
+  const { dataSubmitState } = shaForm ?? {};
 
   return (
     <ComponentsContainerProvider ContainerComponent={ComponentsContainerForm}>
       <ShaSpin spinning={showDataSubmitIndicator && dataSubmitState?.status === 'loading'} tip="Saving data...">
         <Form
+          key={`form-${mergedProps}`} // Force re-render when settings change
           form={form}
           labelWrap
-          size={props.size}
           onFinish={onFinishInternal}
           onFinishFailed={onFinishFailedInternal}
           onValuesChange={onValuesChangeInternal}
@@ -108,7 +110,10 @@ export const ConfigurableFormRenderer: FC<PropsWithChildren<IConfigurableFormRen
           data-sha-form-id={shaForm.form.id}
           data-sha-form-name={`${shaForm.form.module}/${shaForm.form.name}`}
         >
-          <ComponentsContainer containerId={ROOT_COMPONENT_KEY} />
+          <ComponentsContainer 
+            key={`container-${mergedProps}`} // Force re-render of components container
+            containerId={ROOT_COMPONENT_KEY} 
+          />
           {children}
         </Form>
       </ShaSpin>

@@ -9,6 +9,7 @@ import AttributeDecorator from '../attributeDecorator';
 import { IStyleType, isValidGuid, useActualContextData, useCalculatedModel } from '@/index';
 import { useFormComponentStyles } from '@/hooks/formComponentHooks';
 import { useShaFormUpdateDate } from '@/providers/form/providers/shaFormProvider';
+import { useFormDesignerStateSelector } from '@/providers/formDesigner';
 
 export interface IFormComponentProps {
   componentModel: IConfigurableFormComponent;
@@ -38,6 +39,7 @@ const FormComponent: FC<IFormComponentProps> = ({ componentModel, componentRef }
   const getToolboxComponent = useFormDesignerComponentGetter();
   const { anyOfPermissionsGranted } = useSheshaApplication();
   const { activeDevice } = useCanvas();
+  const formSettings = useFormDesignerStateSelector(state => state.formSettings);
 
   const deviceModel = Boolean(activeDevice) && typeof activeDevice === 'string'
     ? { ...componentModel, ...componentModel?.[activeDevice] }
@@ -53,6 +55,17 @@ const FormComponent: FC<IFormComponentProps> = ({ componentModel, componentRef }
     undefined
   );
 
+  const modelWithSettings = useMemo(() => {
+    return ({
+      ...actualModel,
+      formSettings, // Add form settings to the model
+      hidden: shaForm.formMode !== 'designer' && (
+        actualModel.hidden ||
+        !anyOfPermissionsGranted(actualModel?.permissions || []) ||
+        !isComponentFiltered(actualModel))
+    });
+  }, [actualModel, formSettings]); // Add formSettings to dependencies
+
   actualModel.hidden = shaForm.formMode !== 'designer'
     && (
       actualModel.hidden
@@ -63,6 +76,8 @@ const FormComponent: FC<IFormComponentProps> = ({ componentModel, componentRef }
     actualModel.propertyName = undefined;
 
   actualModel.allStyles = useFormComponentStyles(actualModel);
+
+  
 
   const calculatedModel = useCalculatedModel(actualModel, toolboxComponent?.useCalculateModel, toolboxComponent?.calculateModel);
 
@@ -75,7 +90,7 @@ const FormComponent: FC<IFormComponentProps> = ({ componentModel, componentRef }
       shaApplication={shaApplication}
       key={actualModel.id}
     />
-  ), [actualModel, actualModel.hidden, actualModel.allStyles, calculatedModel]);
+  ), [actualModel, actualModel.hidden, actualModel.allStyles, calculatedModel,modelWithSettings ]);
 
   if (!toolboxComponent)
     return <ComponentError errors={{
